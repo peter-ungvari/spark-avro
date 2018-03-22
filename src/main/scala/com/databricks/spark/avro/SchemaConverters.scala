@@ -43,8 +43,8 @@ object SchemaConverters {
     */
   private def isDecimalField(avroSchema: Schema): Boolean = {
     val nullableLogicalTypeNode = avroSchema.getJsonProp("logicalType")
-    val logicalTypeOption = Option(nullableLogicalTypeNode).map(_.asText)
-    val matchLogicalType = logicalTypeOption.contains("decimal")
+    val logicalTypeOption = Option(nullableLogicalTypeNode).map(_.asText())
+    val matchLogicalType = logicalTypeOption == Some("decimal")
     val hasScale = Option(decimalScaleProp(avroSchema))
       .map(_.asInt(Int.MinValue)).exists(_ >= 0)
     val hasPrecision = Option(decimalPrecisionProp(avroSchema))
