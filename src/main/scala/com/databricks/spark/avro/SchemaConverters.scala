@@ -39,6 +39,20 @@ object SchemaConverters {
   case class SchemaType(dataType: DataType, nullable: Boolean)
 
   /**
+    * Indicator of a field with decimal logical type and scale property.
+    */
+  private def isDecimalField(avroSchema: Schema): Boolean = {
+    val nullableLogicalTypeNode = avroSchema.getJsonProp("logicalType")
+    val logicalTypeOption = Option(nullableLogicalTypeNode).map(_.asText)
+    val matchLogicalType = logicalTypeOption.contains("decimal")
+    val hasScale = Option(decimalScaleProp(avroSchema))
+      .map(_.asInt(Int.MinValue)).exists(_ >= 0)
+    val hasPrecision = Option(decimalPrecisionProp(avroSchema))
+      .map(_.asInt(Int.MinValue)).exists(_ > 0)
+    matchLogicalType && hasScale && hasPrecision
+  }
+
+  /**
    * This function takes an avro schema and returns a sql schema.
    */
   def toSqlType(avroSchema: Schema): SchemaType = {
@@ -46,7 +60,12 @@ object SchemaConverters {
       case INT => SchemaType(IntegerType, nullable = false)
       case STRING => SchemaType(StringType, nullable = false)
       case BOOLEAN => SchemaType(BooleanType, nullable = false)
-      case BYTES => SchemaType(BinaryType, nullable = false)
+      case BYTES => if (isDecimalField(avroSchema)) {
+        SchemaType(DecimalType(
+          decimalPrecisionProp(avroSchema).asInt,
+          decimalScaleProp(avroSchema).asInt
+        ), nullable = false)
+      } else SchemaType(BinaryType, nullable = false)
       case DOUBLE => SchemaType(DoubleType, nullable = false)
       case FLOAT => SchemaType(FloatType, nullable = false)
       case LONG => SchemaType(LongType, nullable = false)
@@ -106,6 +125,25 @@ object SchemaConverters {
     }
   }
 
+  private def decimalScaleProp(avroSchema: Schema) = {
+    avroSchema.getJsonProp("scale")
+  }
+
+  private def decimalPrecisionProp(avroSchema: Schema) = {
+    avroSchema.getJsonProp("precision")
+  }
+
+  private def withLogicalType[T](dataType: DataType, newField: FieldBuilder[T]) = {
+    dataType match {
+      case decimalType : DecimalType =>
+        newField
+          .prop("logicalType", "decimal")
+          .prop("precision", decimalType.precision.toString)
+          .prop("scale", decimalType.scale.toString)
+      case _ => newField
+    }
+  }
+
   /**
    * This function converts sparkSQL StructType into avro schema. This method uses two other
    * converter methods in order to do the conversion.
@@ -116,13 +154,14 @@ object SchemaConverters {
       recordNamespace: String): T = {
     val fieldsAssembler: FieldAssembler[T] = schemaBuilder.fields()
     structType.fields.foreach { field =>
-      val newField = fieldsAssembler.name(field.name).`type`()
+      val fieldBuilder = fieldsAssembler.name(field.name)
+      val typeBuilder = withLogicalType(field.dataType, fieldBuilder).`type`()
 
       if (field.nullable) {
-        convertFieldTypeToAvro(field.dataType, newField.nullable(), field.name, recordNamespace)
+        convertFieldTypeToAvro(field.dataType, typeBuilder.nullable(), field.name, recordNamespace)
           .noDefault
       } else {
-        convertFieldTypeToAvro(field.dataType, newField, field.name, recordNamespace)
+        convertFieldTypeToAvro(field.dataType, typeBuilder, field.name, recordNamespace)
           .noDefault
       }
     }
@@ -168,6 +207,17 @@ object SchemaConverters {
               val bytes = new Array[Byte](byteBuffer.remaining)
               byteBuffer.get(bytes)
               bytes
+            }
+
+        case (decimalType: DecimalType, BYTES) =>
+          (item: AnyRef) =>
+            if (item == null) {
+              null
+            } else {
+              val byteBuffer = item.asInstanceOf[ByteBuffer]
+              val bytes = new Array[Byte](byteBuffer.remaining)
+              byteBuffer.get(bytes)
+              BigDecimal(BigInt(bytes), decimalType.scale)
             }
 
         case (struct: StructType, RECORD) =>
