@@ -133,17 +133,6 @@ object SchemaConverters {
     avroSchema.getJsonProp("precision")
   }
 
-  private def withLogicalType[T](dataType: DataType, newField: FieldBuilder[T]) = {
-    dataType match {
-      case decimalType : DecimalType =>
-        newField
-          .prop("logicalType", "decimal")
-          .prop("precision", decimalType.precision.toString)
-          .prop("scale", decimalType.scale.toString)
-      case _ => newField
-    }
-  }
-
   /**
    * This function converts sparkSQL StructType into avro schema. This method uses two other
    * converter methods in order to do the conversion.
@@ -154,14 +143,13 @@ object SchemaConverters {
       recordNamespace: String): T = {
     val fieldsAssembler: FieldAssembler[T] = schemaBuilder.fields()
     structType.fields.foreach { field =>
-      val fieldBuilder = fieldsAssembler.name(field.name)
-      val typeBuilder = withLogicalType(field.dataType, fieldBuilder).`type`()
+      val newField = fieldsAssembler.name(field.name).`type`()
 
       if (field.nullable) {
-        convertFieldTypeToAvro(field.dataType, typeBuilder.nullable(), field.name, recordNamespace)
+        convertFieldTypeToAvro(field.dataType, newField.nullable(), field.name, recordNamespace)
           .noDefault
       } else {
-        convertFieldTypeToAvro(field.dataType, typeBuilder, field.name, recordNamespace)
+        convertFieldTypeToAvro(field.dataType, newField, field.name, recordNamespace)
           .noDefault
       }
     }
@@ -373,7 +361,8 @@ object SchemaConverters {
       case LongType => schemaBuilder.longType()
       case FloatType => schemaBuilder.floatType()
       case DoubleType => schemaBuilder.doubleType()
-      case _: DecimalType => schemaBuilder.bytesType()
+      case decimalType: DecimalType =>
+        createBytesWithDecimalLogicalType(schemaBuilder.bytesBuilder(), decimalType)
       case StringType => schemaBuilder.stringType()
       case BinaryType => schemaBuilder.bytesType()
       case BooleanType => schemaBuilder.booleanType()
@@ -400,6 +389,15 @@ object SchemaConverters {
     }
   }
 
+  private def createBytesWithDecimalLogicalType[T](
+    bytesBuilder: BytesBuilder[T], decimalType: DecimalType) = {
+    bytesBuilder
+      .prop("logicalType", "decimal")
+      .prop("precision", decimalType.precision.toString)
+      .prop("scale", decimalType.scale.toString)
+      .endBytes()
+  }
+
   /**
    * This function is used to construct fields of the avro record, where schema of the field is
    * specified by avro representation of dataType. Since builders for record fields are different
@@ -417,7 +415,8 @@ object SchemaConverters {
       case LongType => newFieldBuilder.longType()
       case FloatType => newFieldBuilder.floatType()
       case DoubleType => newFieldBuilder.doubleType()
-      case _: DecimalType => newFieldBuilder.bytesType()
+      case decimalType: DecimalType =>
+        createBytesWithDecimalLogicalType(newFieldBuilder.bytesBuilder(), decimalType)
       case StringType => newFieldBuilder.stringType()
       case BinaryType => newFieldBuilder.bytesType()
       case BooleanType => newFieldBuilder.booleanType()

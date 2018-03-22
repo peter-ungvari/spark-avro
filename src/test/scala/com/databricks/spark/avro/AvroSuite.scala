@@ -495,11 +495,9 @@ class AvroSuite extends FunSuite with BeforeAndAfterAll {
       val times = spark.read.avro(avroDir).select("Time").collect()
       assert(times.map(_(0)).toSet == Set(666, 777, 42))
 
-      // DecimalType should be converted to bytes
+      // DecimalType should be converted to java.math.BigDecimal
       val decimals = spark.read.avro(avroDir).select("Decimal").collect()
-      for (i <- decimalBytes.indices) {
-        assert(decimals(1)(0).asInstanceOf[Array[Byte]](i) == decimalBytes(i))
-      }
+      assert(decimals.map(_(0)).contains(new java.math.BigDecimal("3.14")))
 
       // There should be a null entry
       val length = spark.read.avro(avroDir).select("Length").collect()
