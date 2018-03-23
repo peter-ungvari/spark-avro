@@ -34,6 +34,8 @@ spIgnoreProvided := true
 
 sparkComponents := Seq("sql")
 
+bintrayRepository := "peter-ungvari-maven-public"
+
 libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.7.5",
   "org.apache.avro" % "avro" % "1.7.6" exclude("org.mortbay.jetty", "servlet-api"),
@@ -79,10 +81,10 @@ licenses += ("Apache-2.0", url("http://www.apache.org/licenses/LICENSE-2.0"))
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 pomExtra :=
-  <url>https://github.com/databricks/spark-avro</url>
+  <url>https://github.com/peter-ungvari/spark-avro</url>
   <scm>
-    <url>git@github.com:databricks/spark-avro.git</url>
-    <connection>scm:git:git@github.com:databricks/spark-avro.git</connection>
+    <url>git@github.com:peter-ungvari/spark-avro.git</url>
+    <connection>scm:git:git@github.com:peter-ungvari/spark-avro.git</connection>
   </scm>
   <developers>
     <developer>
@@ -99,6 +101,11 @@ pomExtra :=
       <id>vlyubin</id>
       <name>Volodymyr Lyubinets</name>
       <url>https://github.com/vlyubin</url>
+    </developer>
+    <developer>
+      <id>peter-ungvari</id>
+      <name>Peter Ungvari</name>
+      <url>https://github.com/peter-ungvari</url>
     </developer>
   </developers>
 
