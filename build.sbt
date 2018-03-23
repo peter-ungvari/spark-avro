@@ -1,6 +1,6 @@
 name := "spark-avro"
 
-organization := "com.databricks"
+organization := "com.github.peter-ungvari"
 
 scalaVersion := "2.11.8"
 
