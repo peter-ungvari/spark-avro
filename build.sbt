@@ -34,8 +34,6 @@ spIgnoreProvided := true
 
 sparkComponents := Seq("sql")
 
-bintrayRepository := "peter-ungvari-maven-public"
-
 libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.7.5",
   "org.apache.avro" % "avro" % "1.7.6" exclude("org.mortbay.jetty", "servlet-api"),
